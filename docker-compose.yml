@@ -1,0 +1,81 @@
+version: "3.7"
+services:
+
+  # postgres used by airflow
+  postgres:
+    image: psheer/postgis:12.1
+    networks:
+      - default_net
+    hostname: postgres
+    volumes: 
+      - ./db_scripts3/pg-init-scripts:/docker-entrypoint-initdb.d
+    environment:
+      - POSTGRES_USER=airflow
+      - POSTGRES_PASS=airflow
+      - POSTGRES_DBNAME=airflow
+      - ALLOW_IP_RANGE=0.0.0.0/0
+    ports:
+      - "5432:5432"
+
+  # airflow LocalExecutor
+  airflow-webserver:
+    image: psheer/airflow-spark:2.4.7_1.10.14
+    restart: always
+    networks:
+      - default_net
+    depends_on:
+      - postgres
+    environment:
+      - LOAD_EX=n
+      - EXECUTOR=Local
+      - FERNET_KEY=v-STCavygWLUfWPZaSMvDwh0iIpMNxJddcvzq74Fz5c=
+
+    volumes:
+      - ./dags:/usr/local/airflow/dags #DAG folder
+      - ./spark/app:/usr/local/spark/app #Spark Scripts (Must be the same path in airflow and Spark Cluster)
+      - ./spark/resources/data:/usr/local/spark/resources/data #Data folder (Must be the same path in airflow and Spark Cluster)
+    ports:
+      - "8282:8282"
+    command: webserver
+    healthcheck:
+      test: ["CMD-SHELL", "[ -f /usr/local/airflow/airflow-webserver.pid ]"]
+      interval: 30s
+      timeout: 30s
+      retries: 3
+            
+  spark-master:
+    image: psheer/spark-master:2.4.7
+    hostname: spark-master
+    ports:
+      - "8080:8080"
+      - "7077:7077"
+    environment:
+      - "MASTER_ARGS="
+      - PYSPARK_DRIVER_PYTHON=/usr/bin/python3
+      - PYSPARK_PYTHON=/usr/bin/python3
+    networks:
+      - default_net
+    volumes:
+      - ./spark/app:/usr/local/spark/app
+      - ./spark/resources/data:/usr/local/spark/resources/data
+
+  spark-worker:
+    image: psheer/spark-worker:2.4.7
+    hostname: spark-worker
+    depends_on:
+      - spark-master
+    ports:
+      - "8081:8081"
+    environment:
+      - "SPARK_MASTER=spark://spark-master:7077"
+      - "WORKER_ARGS=--cores 2 --memory 2G"
+      - PYSPARK_DRIVER_PYTHON=/usr/bin/python3
+      - PYSPARK_PYTHON=/usr/bin/python3
+    networks:
+      - default_net
+    volumes:
+      - ./spark/app:/usr/local/spark/app
+      - ./spark/resources/data:/usr/local/spark/resources/data
+
+networks:
+    default_net:
