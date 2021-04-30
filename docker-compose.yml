@@ -43,39 +43,5 @@ services:
       timeout: 30s
       retries: 3
             
-  spark-master:
-    image: psheer/spark-master:2.4.7
-    hostname: spark-master
-    ports:
-      - "8080:8080"
-      - "7077:7077"
-    environment:
-      - "MASTER_ARGS="
-      - PYSPARK_DRIVER_PYTHON=/usr/bin/python3
-      - PYSPARK_PYTHON=/usr/bin/python3
-    networks:
-      - default_net
-    volumes:
-      - ./spark/app:/usr/local/spark/app
-      - ./spark/resources/data:/usr/local/spark/resources/data
-
-  spark-worker:
-    image: psheer/spark-worker:2.4.7
-    hostname: spark-worker
-    depends_on:
-      - spark-master
-    ports:
-      - "8081:8081"
-    environment:
-      - "SPARK_MASTER=spark://spark-master:7077"
-      - "WORKER_ARGS=--cores 2 --memory 2G"
-      - PYSPARK_DRIVER_PYTHON=/usr/bin/python3
-      - PYSPARK_PYTHON=/usr/bin/python3
-    networks:
-      - default_net
-    volumes:
-      - ./spark/app:/usr/local/spark/app
-      - ./spark/resources/data:/usr/local/spark/resources/data
-
 networks:
     default_net:
